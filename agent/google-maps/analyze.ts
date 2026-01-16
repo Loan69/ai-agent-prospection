@@ -1,7 +1,6 @@
-// agent/google-maps/analyze.ts
 import * as cheerio from "cheerio";
 
-type WebsiteAnalysis = {
+export type WebsiteAnalysis = {
   exists: boolean;
   loadTime?: number;
   hasMobileVersion?: boolean;

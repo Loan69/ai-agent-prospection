@@ -24,12 +24,12 @@ export async function GET() {
         sendLog("info", "🚀 Démarrage de la recherche Google Maps...");
         
         // 1️⃣ Récupérer les entreprises
-        sendLog("info", "📍 Recherche d'entreprises autour de Lyon 7...");
+        sendLog("info", "📍 Recherche d'entreprises...");
         sendLog("info", "🎯 Ciblage: restaurants, boutiques, services professionnels...");
         const allPlaces = await fetchGooglePlaces({
           location: "Lyon 7, France",
           radius: 2000,
-          maxResults: 30,
+          maxResults: 20,
         });
         
         sendLog("success", `✅ ${allPlaces.length} entreprises trouvées`);
@@ -115,6 +115,7 @@ export async function GET() {
               has_website: !!place.website,
               website_analysis: websiteAnalysis,
               score: scoring.score,
+              reasoning: scoring.reasoning, // Ajout du raisonnement
               message_generated: scoring.message,
               fetched_at: new Date().toISOString(),
             },

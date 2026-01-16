@@ -1,4 +1,3 @@
-// agent/google-maps/score.ts
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -36,39 +35,54 @@ ENTREPRISE À ANALYSER:
 - Site web: ${business.hasWebsite ? "Oui" : "Non"}
 - Analyse du site: ${business.websiteAnalysis}
 
-CRITÈRES DE QUALIFICATION:
-1. **Capacité financière**: L'entreprise génère-t-elle assez de CA pour se payer des services web (min 200k€/an) ?
-   - Utilise le nombre d'avis, la note, et le type d'activité pour estimer
-   - Restaurants avec 200+ avis = probablement rentable
-   - Boutiques avec 50+ avis = probablement viable
-   - Services professionnels (avocats, comptables) = souvent bon CA
+CRITÈRES DE QUALIFICATION (IMPORTANT - SOIS RIGOUREUX):
 
-2. **Besoin web**: L'activité nécessite-t-elle une présence web forte ?
-   - Restaurants, boutiques, services = OUI
-   - Artisans locaux uniquement = MOYEN
-   
-3. **Opportunités**: Y a-t-il des axes d'amélioration clairs et vendables ?
-   - Pas de site = grosse opportunité
-   - Site avec problèmes = opportunité moyenne
-   - Site moderne et performant = faible opportunité
+1. **Capacité financière** (Score max: 3 points)
+   - L'entreprise génère-t-elle assez de CA pour investir dans le web (min 200k€/an) ?
+   - Indicateurs à utiliser:
+     * 200+ avis Google = très probablement rentable → 3 pts
+     * 100-200 avis = probablement rentable → 2 pts
+     * 50-100 avis = peut-être rentable → 1 pt
+     * < 50 avis = incertain → 0 pt
+   - Note > 4.5 étoiles = bonus +0.5 pt
+
+2. **Besoin web** (Score max: 3 points)
+   - L'activité nécessite-t-elle VRAIMENT une forte présence web ?
+   - Commerce/Restaurant/Services = 3 pts (clients cherchent en ligne)
+   - Artisans locaux = 2 pts (besoin moyen)
+   - Services ultra-locaux = 1 pt (faible besoin)
+
+3. **Opportunités concrètes** (Score max: 4 points)
+   - PAS DE SITE WEB = 4 pts (création complète)
+   - Site avec 3+ problèmes critiques = 3 pts (refonte nécessaire)
+   - Site avec 1-2 problèmes = 2 pts (améliorations ciblées)
+   - Site moderne sans problème majeur = 0-1 pt (peu d'opportunité)
+
+⚠️ RÈGLE CRITIQUE: Si l'entreprise a un site moderne SANS problèmes détectés et SANS opportunités identifiées, le score DOIT être < 6/10 car il n'y a PAS de raison de les contacter.
 
 TÂCHE:
-1. Estime la taille de l'entreprise: "small" (< 5 employés), "medium" (5-20), "large" (20+)
-2. Note la pertinence du lead de 0 à 10
-3. Explique ton raisonnement en 2-3 phrases
-4. Si score >= 6: Génère un message de prospection personnalisé (3-4 phrases max, professionnel mais sympa)
-5. Si score < 6: Écris juste "SKIP"
+1. Estime la taille: "small" (< 5 employés), "medium" (5-20), "large" (20+)
+2. Calcule le score selon les critères ci-dessus (MAX 10/10)
+3. Explique PRÉCISÉMENT ton raisonnement en justifiant chaque point attribué
+4. Si score >= 6: Génère un message de prospection personnalisé (3-4 phrases, mentionne les problèmes/opportunités spécifiques)
+5. Si score < 6: Écris "SKIP" + explique pourquoi
 
 FORMAT DE RÉPONSE:
 TAILLE: [small/medium/large]
 NOTE: [0-10]/10
-RAISONNEMENT: [Ton analyse]
+RAISONNEMENT: 
+Capacité financière: [X/3 pts] - [justification précise]
+Besoin web: [X/3 pts] - [justification]
+Opportunités: [X/4 pts] - [justification détaillée des problèmes trouvés]
+TOTAL: [X/10]
+Conclusion: [Pourquoi ce score]
+
 MESSAGE: [Message de prospection OU "SKIP"]`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.7,
+    temperature: 0.5, // Réduit pour plus de cohérence
   });
 
   const response = completion.choices[0].message.content || "";

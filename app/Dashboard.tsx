@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 // Types
@@ -25,6 +25,9 @@ type WebsiteAnalysis = {
   loadTime?: number;
   hasMobileVersion?: boolean;
   hasSSL: boolean;
+  pageTitle?: string;
+  metaDescription?: string;
+  hasContactForm?: boolean;
   issues: string[];
   opportunities: string[];
 };
@@ -42,6 +45,7 @@ type GoogleLead = {
   has_website: boolean;
   website_analysis?: WebsiteAnalysis;
   score: number;
+  reasoning?: string; // Ajout du raisonnement IA
   message_generated: string;
   fetched_at: string;
 };
@@ -446,7 +450,6 @@ export default function UnifiedDashboard({
                     key={lead.id}
                     className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl border border-gray-100 overflow-hidden transition-all duration-300 hover:-translate-y-1"
                   >
-                    {/* Google lead card - reprise du code précédent */}
                     <div
                       className={`h-1.5 ${
                         lead.score >= 8
@@ -456,29 +459,351 @@ export default function UnifiedDashboard({
                           : "bg-gradient-to-r from-gray-300 to-gray-400"
                       }`}
                     ></div>
-                    <div className="p-6 space-y-4">
+
+                    <div className="p-6 md:p-8 space-y-5">
+                      {/* Header avec nom + score */}
                       <div className="flex justify-between items-start gap-4">
-                        <h2 className="text-2xl font-bold">{lead.business_name}</h2>
-                        <div
-                          className={`px-4 py-2 rounded-full text-lg font-bold ${
-                            lead.score >= 8
-                              ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white"
-                              : "bg-gradient-to-r from-yellow-400 to-orange-500 text-white"
-                          }`}
-                        >
-                          {lead.score}/10
+                        <div className="flex-1">
+                          <h2 className="text-2xl font-bold text-gray-800 leading-tight group-hover:text-emerald-600 transition-colors mb-2">
+                            {lead.business_name}
+                          </h2>
+                          <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+                            <span className="flex items-center gap-1">
+                              📍 {lead.address}
+                            </span>
+                            {lead.phone && (
+                              <span className="flex items-center gap-1">
+                                📞 {lead.phone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 flex flex-col items-center gap-2">
+                          <div
+                            className={`px-4 py-2 rounded-full text-lg font-bold shadow-md ${
+                              lead.score >= 8
+                                ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white"
+                                : lead.score >= 6
+                                ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white"
+                                : "bg-gray-200 text-gray-600"
+                            }`}
+                          >
+                            {lead.score}/10
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {lead.score >= 8
+                              ? "🔥 Très chaud"
+                              : lead.score >= 6
+                              ? "👍 Intéressant"
+                              : "📋 À voir"}
+                          </span>
                         </div>
                       </div>
-                      <p className="text-gray-600 text-sm">{lead.address}</p>
-                      <div className="bg-slate-100 rounded-xl p-4 text-sm whitespace-pre-line">
-                        {lead.message_generated}
+
+                      {/* Infos entreprise */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 text-center">
+                          <div className="text-2xl mb-1">⭐</div>
+                          <div className="text-lg font-bold text-blue-900">
+                            {lead.google_rating}/5
+                          </div>
+                          <div className="text-xs text-blue-700">
+                            {lead.reviews_count} avis
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 text-center">
+                          <div className="text-2xl mb-1">
+                            {sizeEmoji[lead.estimated_size]}
+                          </div>
+                          <div className="text-sm font-semibold text-purple-900">
+                            {sizeLabel[lead.estimated_size]}
+                          </div>
+                          <div className="text-xs text-purple-700">Entreprise</div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-3 text-center">
+                          <div className="text-2xl mb-1">🏷️</div>
+                          <div className="text-sm font-semibold text-amber-900 capitalize">
+                            {lead.category}
+                          </div>
+                          <div className="text-xs text-amber-700">Catégorie</div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 text-center">
+                          <div className="text-2xl mb-1">
+                            {lead.has_website ? "✅" : "❌"}
+                          </div>
+                          <div className="text-sm font-semibold text-green-900">
+                            {lead.has_website ? "Oui" : "Non"}
+                          </div>
+                          <div className="text-xs text-green-700">Site web</div>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => copyMessage(lead.message_generated, lead.id)}
-                        className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all"
-                      >
-                        {copiedId === lead.id ? "✅ Copié !" : "📋 Copier"}
-                      </button>
+
+                      {/* Analyse technique du site (si existe) */}
+                      {lead.website_analysis && lead.has_website && (
+                        <div className="space-y-3">
+                          <button
+                            onClick={() =>
+                              setExpandedLead(
+                                expandedLead === lead.id ? null : lead.id
+                              )
+                            }
+                            className="flex items-center gap-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+                          >
+                            <span>{expandedLead === lead.id ? "▼" : "▶"}</span>
+                            <span>
+                              🔍 Analyse technique du site ({lead.website_analysis.issues.length}{" "}
+                              problème(s), {lead.website_analysis.opportunities.length}{" "}
+                              opportunité(s))
+                            </span>
+                          </button>
+
+                          {expandedLead === lead.id && (
+                            <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-5 space-y-4 border-l-4 border-red-400 animate-in slide-in-from-top">
+                              {/* Infos techniques */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pb-4 border-b border-orange-200">
+                                <div className="text-center">
+                                  <div className="text-xs text-gray-600 mb-1">
+                                    Temps de chargement
+                                  </div>
+                                  <div
+                                    className={`text-lg font-bold ${
+                                      (lead.website_analysis.loadTime || 0) > 3000
+                                        ? "text-red-600"
+                                        : "text-green-600"
+                                    }`}
+                                  >
+                                    {lead.website_analysis.loadTime
+                                      ? `${lead.website_analysis.loadTime}ms`
+                                      : "N/A"}
+                                  </div>
+                                </div>
+
+                                <div className="text-center">
+                                  <div className="text-xs text-gray-600 mb-1">SSL</div>
+                                  <div
+                                    className={`text-2xl ${
+                                      lead.website_analysis.hasSSL
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    {lead.website_analysis.hasSSL ? "🔒" : "⚠️"}
+                                  </div>
+                                </div>
+
+                                <div className="text-center">
+                                  <div className="text-xs text-gray-600 mb-1">
+                                    Version mobile
+                                  </div>
+                                  <div
+                                    className={`text-2xl ${
+                                      lead.website_analysis.hasMobileVersion
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    {lead.website_analysis.hasMobileVersion
+                                      ? "📱"
+                                      : "❌"}
+                                  </div>
+                                </div>
+
+                                <div className="text-center">
+                                  <div className="text-xs text-gray-600 mb-1">
+                                    Formulaire contact
+                                  </div>
+                                  <div
+                                    className={`text-2xl ${
+                                      lead.website_analysis.hasContactForm
+                                        ? "text-green-600"
+                                        : "text-orange-600"
+                                    }`}
+                                  >
+                                    {lead.website_analysis.hasContactForm
+                                      ? "📧"
+                                      : "➖"}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Titre de page */}
+                              {lead.website_analysis.pageTitle && (
+                                <div>
+                                  <h4 className="text-sm font-semibold text-gray-700 mb-1">
+                                    📄 Titre de la page
+                                  </h4>
+                                  <p className="text-sm text-gray-600 italic">
+                                    "{lead.website_analysis.pageTitle}"
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Problèmes détectés */}
+                              {lead.website_analysis.issues.length > 0 && (
+                                <div>
+                                  <h4 className="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                    <span>⚠️</span>
+                                    <span>
+                                      Problèmes critiques détectés (
+                                      {lead.website_analysis.issues.length})
+                                    </span>
+                                  </h4>
+                                  <ul className="space-y-1">
+                                    {lead.website_analysis.issues.map((issue, i) => (
+                                      <li
+                                        key={i}
+                                        className="text-sm text-red-700 flex items-start gap-2"
+                                      >
+                                        <span className="text-red-400 mt-0.5">
+                                          •
+                                        </span>
+                                        <span>{issue}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Opportunités */}
+                              {lead.website_analysis.opportunities.length > 0 && (
+                                <div>
+                                  <h4 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                                    <span>💡</span>
+                                    <span>
+                                      Axes d'amélioration identifiés (
+                                      {lead.website_analysis.opportunities.length})
+                                    </span>
+                                  </h4>
+                                  <ul className="space-y-1">
+                                    {lead.website_analysis.opportunities.map(
+                                      (opp, i) => (
+                                        <li
+                                          key={i}
+                                          className="text-sm text-orange-700 flex items-start gap-2"
+                                        >
+                                          <span className="text-orange-400 mt-0.5">
+                                            ✓
+                                          </span>
+                                          <span>{opp}</span>
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Message si pas de site web */}
+                      {!lead.has_website && (
+                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-5 border-l-4 border-purple-400">
+                          <div className="flex items-start gap-3">
+                            <span className="text-3xl">💎</span>
+                            <div>
+                              <h4 className="font-semibold text-purple-900 mb-1">
+                                Opportunité premium : Pas de site web
+                              </h4>
+                              <p className="text-sm text-purple-700">
+                                Cette entreprise n'a pas encore de présence web
+                                professionnelle. C'est une excellente opportunité pour
+                                proposer une création complète avec un fort potentiel de
+                                conversion.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Raisonnement de l'IA */}
+                      {lead.reasoning && (
+                        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 border-l-4 border-indigo-400">
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl">🤖</span>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+                                Analyse IA - Justification du score {lead.score}/10
+                              </h4>
+                              <div className="text-sm text-indigo-800 whitespace-pre-line leading-relaxed">
+                                {lead.reasoning}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Message de prospection */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-600">
+                            ✨ Message de prospection personnalisé
+                          </span>
+                        </div>
+                        <div className="bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-200 rounded-xl p-5 text-sm leading-relaxed text-gray-700 whitespace-pre-line">
+                          {lead.message_generated}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-4 border-t border-gray-100">
+                        <div className="flex flex-wrap gap-3">
+                          {lead.website && (
+                            <a
+                              href={lead.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white text-sm font-medium transition-all shadow-md hover:shadow-lg"
+                            >
+                              <span>🌐</span>
+                              <span>Voir le site</span>
+                            </a>
+                          )}
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              lead.business_name + " " + lead.address
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium transition-colors"
+                          >
+                            <span>📍</span>
+                            <span>Google Maps</span>
+                          </a>
+                          {lead.phone && (
+                            <a
+                              href={`tel:${lead.phone}`}
+                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium transition-colors"
+                            >
+                              <span>📞</span>
+                              <span>Appeler</span>
+                            </a>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() =>
+                            copyMessage(lead.message_generated, lead.id)
+                          }
+                          className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                        >
+                          {copiedId === lead.id ? (
+                            <span className="flex items-center gap-2">
+                              <span>✅</span>
+                              <span>Copié !</span>
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-2">
+                              <span>📋</span>
+                              <span>Copier le message</span>
+                            </span>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
