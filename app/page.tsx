@@ -11,7 +11,7 @@ export default async function OpportunitiesPage() {
     .from("codeur_projects")
     .select("*")
     .gte("fetched_at", startOfToday.toISOString())
-    .order("score", { ascending: false });
+    .order("published_at", { ascending: false });
 
   const { data: codeurOld } = await supabase
     .from("codeur_projects")
@@ -19,7 +19,7 @@ export default async function OpportunitiesPage() {
     .or(
     `fetched_at.lt.${startOfToday.toISOString()},fetched_at.is.null`
     )
-    .order("fetched_at", { ascending: false })
+    .order("published_at", { ascending: false })
     .limit(50);
 
   // Récupérer leads Google Maps

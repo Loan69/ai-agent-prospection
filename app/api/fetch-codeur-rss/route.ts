@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { generateMessage } from "@/agent/messaging/generate";
 import { cleanText } from "@/lib/text";
 
-const SKILLS = ["SaaS", "site vitrine", "application mobile", "développement web"];
+const SKILLS = ["SaaS", "site vitrine", "application mobile", "développement", "React", "react", "application","site"];
 
 export async function GET() {
   const encoder = new TextEncoder();
@@ -21,7 +21,14 @@ export async function GET() {
         
         // 1️⃣ Fetch RSS
         sendLog("info", "📡 Récupération du flux RSS...");
-        const res = await fetch("https://www.codeur.com/projects.rss");
+        const res = await fetch("https://www.codeur.com/projects.rss", {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
+          cache: 'no-store',
+        });
         const xml = await res.text();
         
         // 2️⃣ Parser le XML
@@ -33,7 +40,8 @@ export async function GET() {
           const title = cleanText($(el).find("title").text());
           const description = cleanText($(el).find("description").text());
           const link = $(el).find("link").text();
-          items.push({ title, description, link });
+          const published_date = cleanText($(el).find("pubDate").text());
+          items.push({ title, description, link, published_date });
         });
         
         sendLog("success", `✅ ${items.length} projets trouvés dans le flux RSS`);
@@ -47,9 +55,20 @@ export async function GET() {
         for (const project of items) {
           const content = `${project.title} ${project.description}`.toLowerCase();
           const isMatch = SKILLS.some(skill => content.includes(skill));
+          const isLastHour = Date.now() - new Date(project.published_date).getTime() <= 7200000; // 2 heures
           
-          if (!isMatch) continue;
+          // Vérifier si le projet correspond au champ de compétence
+          if (!isMatch) {
+            sendLog("warning", `⏭️  Projet hors de votre champ d'expertise`);
+            continue;
+          };
           
+          // Vérifier si le projet est récent (- moins de 2 heures)
+          if (!isLastHour) {
+            sendLog("warning", `⏭️  Projet trop ancien`);
+            continue;
+          };
+
           matchedCount++;
           sendLog("info", `📋 Analyse du projet: "${project.title.substring(0, 50)}..."`);
           
@@ -77,21 +96,32 @@ export async function GET() {
             business_angle: "développement de sites web, SaaS ou applications sur mesure",
           });
           
-          if (message.content.trim() === "SKIP") {
-            sendLog("warning", `❌ IA a décidé de skipper ce projet`);
-            continue;
+          // Extraire la note
+          const scoreMatch = message.content.match(/NOTE:\s*(\d+)\/10/);
+          const score = scoreMatch ? Number(scoreMatch[1]) : 0;
+          
+          // Extraire le raisonnement (entre NOTE et MESSAGE)
+          const reasoningMatch = message.content.match(/RAISONNEMENT:\s*([\s\S]*?)\nMESSAGE:/);
+          const reasoning = reasoningMatch ? reasoningMatch[1].trim() : "Aucune analyse disponible";
+          
+          // Extraire le message final
+          const messageMatch = message.content.match(/MESSAGE:\s*(.+)/s);
+          const cleanMessage = messageMatch ? messageMatch[1].trim() : message.content.replace(/NOTE:\s*\d+\/10\s*/s, "").trim();
+          
+          // Vérifier si skip
+          const shouldSkip = cleanMessage.trim() === "SKIP" || cleanMessage.startsWith("SKIP");
+          
+          if (shouldSkip) {
+            sendLog("warning", `❌ Projet jugé non pertinent (score ${score}/10)`);
+          } else {
+            qualifiedCount++;
+            sendLog("success", `✅ Projet qualifié ! Score: ${score}/10`, { 
+              score, 
+              title: project.title.substring(0, 60)
+            });
           }
           
-          // Extraire la note
-          const noteMatch = message.content.match(/NOTE:\s*(\d+)\/10/);
-          const score = noteMatch ? Number(noteMatch[1]) : null;
-          
-          // Nettoyer le message
-          const cleanMessage = message.content
-            .replace(/NOTE:\s*\d+\/10\s*MESSAGE:/s, "")
-            .trim();
-          
-          // 5️⃣ Sauvegarde
+          // 5️⃣ Sauvegarde (tous les projets, même rejetés)
           sendLog("info", `💾 Sauvegarde dans la base de données...`);
           await supabase.from("codeur_projects").upsert({
             url: project.link,
@@ -100,15 +130,11 @@ export async function GET() {
             matched: true,
             message_generated: cleanMessage,
             score,
+            reasoning, // 👈 AJOUT DE LA COLONNE REASONING
+            published_at: project.published_date,
             fetched_at: new Date().toISOString(),
           }, {
             onConflict: 'url'
-          });
-          
-          qualifiedCount++;
-          sendLog("success", `✅ Projet qualifié ! Score: ${score}/10`, { 
-            score, 
-            title: project.title.substring(0, 60)
           });
         }
         
@@ -118,7 +144,8 @@ export async function GET() {
           total: items.length,
           matched: matchedCount,
           processed: processedCount,
-          qualified: qualifiedCount
+          qualified: qualifiedCount,
+          rejected: processedCount - qualifiedCount
         });
         
         controller.close();

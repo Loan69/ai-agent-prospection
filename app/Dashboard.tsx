@@ -15,9 +15,14 @@ type CodeurProject = {
   title: string;
   description: string;
   score: number;
+  reasoning?: string;
   message_generated: string;
   url: string;
   fetched_at: string;
+  age_minutes?: number;
+  nb_offres?: number;
+  is_urgent?: boolean;
+  published_at?: string;
 };
 
 type WebsiteAnalysis = {
@@ -57,6 +62,17 @@ type UnifiedDashboardProps = {
   googleOld: GoogleLead[];
 };
 
+// Formattage des dates
+export function formatDateFR(dateInput: string | Date | undefined) {
+  return new Date(dateInput || '').toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function UnifiedDashboard({
   codeurNew,
   codeurOld,
@@ -65,12 +81,14 @@ export default function UnifiedDashboard({
 }: UnifiedDashboardProps) {
   const [source, setSource] = useState<"codeur" | "google">("codeur");
   const [timeFilter, setTimeFilter] = useState<"new" | "history">("new");
+  const [scoreFilter, setScoreFilter] = useState<"all" | "qualified" | "rejected">("qualified"); // Nouveau filtre
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
   const router = useRouter();
+  const Rejected = 3;
 
   async function refreshData() {
     setLoading(true);
@@ -146,11 +164,15 @@ export default function UnifiedDashboard({
     codeur: {
       new: codeurNew.length,
       newHigh: codeurNew.filter((p) => p.score >= 8).length,
+      newQualified: codeurNew.filter((p) => p.score >= 6).length,
+      newRejected: codeurNew.filter((p) => p.score < 6).length,
       history: codeurOld.length,
     },
     google: {
       new: googleNew.length,
       newHigh: googleNew.filter((l) => l.score >= 8).length,
+      newQualified: googleNew.filter((l) => l.score >= 6).length,
+      newRejected: googleNew.filter((l) => l.score < 6).length,
       history: googleOld.length,
     },
   };
@@ -181,24 +203,35 @@ export default function UnifiedDashboard({
               </p>
             </div>
 
-            <button
-              onClick={refreshData}
-              disabled={loading}
-              className="group px-6 py-3 rounded-xl bg-white text-purple-600 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="flex items-center gap-2">
-                <span
-                  className={
-                    loading
-                      ? "animate-spin"
-                      : "group-hover:rotate-180 transition-transform duration-500"
-                  }
-                >
-                  🔄
+            <div className="flex gap-3">
+              <a
+                href="/settings"
+                className="px-6 py-3 rounded-xl bg-white/20 backdrop-blur-sm text-white font-semibold border-2 border-white/30 hover:bg-white/30 transition-all duration-200"
+              >
+                <span className="flex items-center gap-2">
+                  <span>⚙️</span>
+                  <span>Paramètres</span>
                 </span>
-                {loading ? "Recherche..." : `Rafraîchir ${source === "codeur" ? "Codeur" : "Google"}`}
-              </span>
-            </button>
+              </a>
+              <button
+                onClick={refreshData}
+                disabled={loading}
+                className="group px-6 py-3 rounded-xl bg-white text-purple-600 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className={
+                      loading
+                        ? "animate-spin"
+                        : "group-hover:rotate-180 transition-transform duration-500"
+                    }
+                  >
+                    🔄
+                  </span>
+                  {loading ? "Recherche..." : `Rafraîchir ${source === "codeur" ? "Codeur" : "Google"}`}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -345,6 +378,51 @@ export default function UnifiedDashboard({
               </button>
             </div>
 
+            {/* Score Filter Tabs - Seulement pour onglet "Nouveaux" */}
+            {timeFilter === "new" && (
+              <div className="flex gap-3 bg-white rounded-2xl p-2 shadow-md">
+                <button
+                  onClick={() => setScoreFilter("qualified")}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                    scoreFilter === "qualified"
+                      ? "bg-green-100 text-green-700 shadow-md"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <span>✅</span>
+                    <span>Qualifiés ({currentStats.newQualified})</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => setScoreFilter("rejected")}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                    scoreFilter === "rejected"
+                      ? "bg-red-100 text-red-700 shadow-md"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <span>❌</span>
+                    <span>Rejetés ({currentStats.newRejected})</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => setScoreFilter("all")}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                    scoreFilter === "all"
+                      ? "bg-gray-100 text-gray-700 shadow-md"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <span>📊</span>
+                    <span>Tous ({currentStats.new})</span>
+                  </span>
+                </button>
+              </div>
+            )}
+
             {/* Stats */}
             {timeFilter === "new" && (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -410,6 +488,26 @@ export default function UnifiedDashboard({
                           {project.score}/10
                         </div>
                       </div>
+                      <p className="text-xs text-gray-500">
+                        📅 Publié le {formatDateFR(project.published_at)}
+                      </p>
+
+                      {/* Raisonnement de l'IA - TOUJOURS AFFICHÉ */}
+                        {project.reasoning && (
+                        <div className="rounded-xl p-5 border-l-4
+                           bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-400">
+                            <div className="flex items-start gap-3">
+                            <div className="flex-1">
+                                <h4 className="font-semibold mb-2 text-indigo-900">                               
+                                    Analyse IA - Justification du score {project.score}/10
+                                </h4>
+                                <div className="text-sm whitespace-pre-line leading-relaxed text-indigo-800">
+                                {project.reasoning}
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+                        )}
 
                       <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-5 border-l-4 border-blue-400">
                         <p className="text-gray-700 leading-relaxed">

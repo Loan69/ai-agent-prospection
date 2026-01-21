@@ -1,3 +1,4 @@
+// app/api/fetch-google-leads/route.ts
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import {
@@ -23,16 +24,60 @@ export async function GET() {
       try {
         sendLog("info", "🚀 Démarrage de la recherche Google Maps...");
         
-        // 1️⃣ Récupérer les entreprises
-        sendLog("info", "📍 Recherche d'entreprises...");
-        sendLog("info", "🎯 Ciblage: restaurants, boutiques, services professionnels...");
-        const allPlaces = await fetchGooglePlaces({
-          location: "Lyon 7, France",
-          radius: 2000,
-          maxResults: 20,
-        });
+        // 1️⃣ Récupérer la configuration depuis Supabase
+        sendLog("info", "📋 Chargement de la configuration...");
+        const { data: config } = await supabase
+          .from("agent_config")
+          .select("*")
+          .single();
         
-        sendLog("success", `✅ ${allPlaces.length} entreprises trouvées`);
+        // Valeurs par défaut si pas de config
+        const zones = config?.zones || [
+          "Lyon 1, France",
+          "Lyon 2, France",
+          "Lyon 3, France",
+          "Lyon 6, France",
+          "Lyon 7, France",
+          "Villeurbanne, France",
+        ];
+        const radius = config?.radius || 3000;
+        const maxResultsPerZone = config?.max_results_per_zone || 20;
+        
+        sendLog("success", `✅ Configuration chargée: ${zones.length} zones, rayon ${radius}m`);
+        sendLog("info", `📍 Scan de ${zones.length} zones géographiques...`);
+        
+        // Collecter toutes les entreprises de toutes les zones
+        const allPlacesMap = new Map(); // Pour éviter les doublons
+        
+        for (let i = 0; i < zones.length; i++) {
+          const zone = zones[i];
+          sendLog("info", `   🔍 [${i + 1}/${zones.length}] Recherche dans ${zone}...`);
+          
+          try {
+            const zonePlaces = await fetchGooglePlaces({
+              location: zone,
+              radius: radius,
+              maxResults: maxResultsPerZone,
+            });
+            
+            // Ajouter à la Map (évite doublons entre zones)
+            zonePlaces.forEach(place => {
+              if (!allPlacesMap.has(place.place_id)) {
+                allPlacesMap.set(place.place_id, place);
+              }
+            });
+            
+            sendLog("success", `   ✅ ${zonePlaces.length} entreprises trouvées dans ${zone}`);
+            
+            // Pause entre chaque zone pour respecter les quotas
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (error) {
+            sendLog("warning", `   ⚠️  Erreur sur ${zone}: ${(error as Error).message}`);
+          }
+        }
+        
+        const allPlaces = Array.from(allPlacesMap.values());
+        sendLog("success", `✅ TOTAL: ${allPlaces.length} entreprises uniques trouvées`);
         
         // 2️⃣ Filtrer les entreprises pertinentes
         sendLog("info", "🎯 Filtrage selon les critères...");
