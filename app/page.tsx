@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import UnifiedDashboard from "./Dashboard";
 import { CodeurProject } from "@/agent/messaging/types";
 
+export const revalidate = 0; // Désactive le cache
+
 export default async function OpportunitiesPage() {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);

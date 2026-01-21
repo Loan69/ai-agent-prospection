@@ -124,8 +124,8 @@ export default function UnifiedDashboard({
             if (log.type === "complete") {
               setTimeout(() => {
                 setShowLogs(false);
-                router.refresh();
-              }, 3000);
+                window.location.href = window.location.pathname + `?refresh=${Date.now()}`;
+                }, 3000);
             }
           }
         }
