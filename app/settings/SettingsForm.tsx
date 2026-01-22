@@ -337,7 +337,7 @@ export default function SettingsForm({ initialConfig }: SettingsFormProps) {
           onClick={() => router.push("/")}
           className="px-8 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
         >
-          Annuler
+          Retour
         </button>
         <button
           onClick={handleSave}

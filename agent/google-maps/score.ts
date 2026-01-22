@@ -1,3 +1,4 @@
+// agent/google-maps/score.ts
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -64,7 +65,7 @@ TÂCHE:
 1. Estime la taille: "small" (< 5 employés), "medium" (5-20), "large" (20+)
 2. Calcule le score selon les critères ci-dessus (MAX 10/10)
 3. Explique PRÉCISÉMENT ton raisonnement en justifiant chaque point attribué
-4. Si score >= 6: Génère un message de prospection personnalisé (3-4 phrases, mentionne les problèmes/opportunités spécifiques)
+4. Si score >= 6: Génère un message de prospection personnalisé (3-4 phrases, mentionne les problèmes/opportunités spécifiques) mais sans jargon technique, il faut que ce soit orienté business et faire sentir au prospect ce qu'il perd à rester dans la même situation
 5. Si score < 6: Écris "SKIP" + explique pourquoi
 
 FORMAT DE RÉPONSE:
@@ -98,5 +99,52 @@ MESSAGE: [Message de prospection OU "SKIP"]`;
     score: scoreMatch ? parseInt(scoreMatch[1]) : 0,
     reasoning: reasoningMatch?.[1]?.trim() || "Pas d'analyse disponible",
     message: messageMatch?.[1]?.trim() || "SKIP",
+  };
+}
+
+/**
+ * Version simplifiée sans IA (pour tests ou backup)
+ */
+export function scoreBusinessSimple(
+  business: BusinessData
+): ScoringResult {
+  let score = 0;
+  const reasons: string[] = [];
+
+  // Scoring basique
+  if (business.reviewsCount > 100) {
+    score += 3;
+    reasons.push("Forte activité (100+ avis)");
+  } else if (business.reviewsCount > 30) {
+    score += 2;
+    reasons.push("Activité correcte");
+  }
+
+  if (business.rating >= 4.0) {
+    score += 2;
+    reasons.push("Bonne réputation");
+  }
+
+  if (!business.hasWebsite) {
+    score += 3;
+    reasons.push("Pas de site = grosse opportunité");
+  } else if (business.websiteAnalysis.includes("problème")) {
+    score += 2;
+    reasons.push("Site à améliorer");
+  }
+
+  // Estimation taille
+  let size: "small" | "medium" | "large" = "small";
+  if (business.reviewsCount > 200) size = "large";
+  else if (business.reviewsCount > 50) size = "medium";
+
+  return {
+    score: Math.min(score, 10),
+    estimatedSize: size,
+    reasoning: reasons.join(", "),
+    message:
+      score >= 6
+        ? `Bonjour, j'ai remarqué votre établissement ${business.name} et je pense pouvoir vous aider à améliorer votre présence en ligne.`
+        : "SKIP",
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import AuditGenerator from "@/agent/google-maps/AuditGenerator";
 
 // Types
 type LogEntry = {
@@ -882,25 +883,30 @@ export default function UnifiedDashboard({
                             </a>
                           )}
                         </div>
+                        
+                        <div className="flex flex-wrap gap-3">
+                            {/* Bouton générer audit */}
+                            <AuditGenerator lead={lead} />
 
-                        <button
-                          onClick={() =>
-                            copyMessage(lead.message_generated, lead.id)
-                          }
-                          className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-                        >
-                          {copiedId === lead.id ? (
-                            <span className="flex items-center gap-2">
-                              <span>✅</span>
-                              <span>Copié !</span>
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-2">
-                              <span>📋</span>
-                              <span>Copier le message</span>
-                            </span>
-                          )}
-                        </button>
+                            <button
+                            onClick={() =>
+                                copyMessage(lead.message_generated, lead.id)
+                            }
+                            className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                            >
+                            {copiedId === lead.id ? (
+                                <span className="flex items-center gap-2">
+                                <span>✅</span>
+                                <span>Copié !</span>
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-2">
+                                <span>📋</span>
+                                <span>Copier le message</span>
+                                </span>
+                            )}
+                            </button>
+                        </div>
                       </div>
                     </div>
                   </div>
